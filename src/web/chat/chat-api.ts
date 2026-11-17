@@ -1,6 +1,7 @@
-// The Chat's two calls. Both go through ../api.ts, so every failure reaches the
-// panel as a RateLimitedError, an ApiError, or a TypeError from fetch when the
-// network fails.
+// The Chat's two calls. Both go through ../api.ts, so a failure reaches the panel
+// as a RateLimitedError, an ApiError, a TypeError from fetch when the network
+// fails, or a SyntaxError when a 2xx body isn't JSON. ./status.ts maps the last
+// two, and anything else, to the generic text.
 import { api, ApiError } from "../api.js";
 import type { Message } from "./conversation.js";
 

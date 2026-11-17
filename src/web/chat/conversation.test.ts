@@ -24,6 +24,23 @@ describe("conversation", () => {
     expect(INITIAL_CONVERSATION.pending).toBe(false);
   });
 
+  it("hides the suggested questions after the first send, even when it fails", () => {
+    expect(INITIAL_CONVERSATION.showSuggestions).toBe(true);
+
+    const sent = send(INITIAL_CONVERSATION, "Where has Emiliano worked?");
+    const failed = conversationReducer(sent, { type: "failed", error: new ApiError(500) });
+
+    expect(sent.showSuggestions).toBe(false);
+    expect(failed.messages).toEqual([]);
+    expect(failed.showSuggestions).toBe(false);
+  });
+
+  it("shows the suggested questions again after starting over", () => {
+    const state = conversationReducer(exchanges(2), { type: "startedOver" });
+
+    expect(state.showSuggestions).toBe(true);
+  });
+
   it("adds the visitor's message and waits for the reply", () => {
     const state = send(INITIAL_CONVERSATION, "Where has Emiliano worked?");
 

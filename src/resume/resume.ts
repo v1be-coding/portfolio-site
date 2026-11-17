@@ -1,8 +1,9 @@
 import PDFDocument from "pdfkit";
 import { educationLine, experienceHeading, type Content } from "../content/content.js";
 
-// Helvetica rather than the site's Atkinson Hyperlegible Next: fontkit 2.0.4
-// subsets WOFF2 from its transformed glyf table, which corrupts glyphs and
+// Helvetica rather than the site's Atkinson Hyperlegible Next: the site's fonts
+// are WOFF2, and fontkit (pdfkit's font engine) subsets WOFF2 from its
+// transformed glyf table, which corrupts glyphs and
 // throws on composite ones such as "i". The standard fonts need no embedding,
 // and every character in the content is in their WinAnsi encoding.
 const REGULAR = "Helvetica";
@@ -56,7 +57,16 @@ export function renderResume(content: Content): Promise<Buffer> {
     doc.font(REGULAR).fontSize(size - 0.5);
     const datesWidth = doc.widthOfString(dates);
     doc.font(font).fontSize(size).fillColor(INK);
-    doc.text(label, left, top, { width: width - datesWidth - 12 });
+    // Helvetica-Bold's AFM kerns a space into the capital after it (space T
+    // -100, space W -80), so after a comma "platform, Team Lead" reads as if
+    // the space were missing, and pdfkit always applies a standard font's
+    // kerning. Kerning only applies within one run, so each space gets its own.
+    const runs = label.split(/( )/).filter(Boolean);
+    runs.forEach((run, index) => {
+      const continued = index < runs.length - 1;
+      if (index === 0) doc.text(run, left, top, { width: width - datesWidth - 12, continued });
+      else doc.text(run, { continued });
+    });
     const bottom = doc.y;
     doc
       .font(REGULAR)

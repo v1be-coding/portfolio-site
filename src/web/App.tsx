@@ -22,6 +22,17 @@ function Page({ route }: { route: Route }) {
   }
 }
 
+// A malformed escape like "#%E0" makes decodeURIComponent throw, and a throw in
+// the effect is a page error; the raw text still matches no id, so the page
+// scrolls to the top instead.
+function decodeHash(hash: string): string {
+  try {
+    return decodeURIComponent(hash);
+  } catch {
+    return hash;
+  }
+}
+
 function App({ initialRoute }: { initialRoute: Route }) {
   const navigation = useNavigation(initialRoute);
 
@@ -31,7 +42,7 @@ function App({ initialRoute }: { initialRoute: Route }) {
     applyHead(headFor(navigation.route));
     // Back and forward leave scrolling to the browser's own restoration.
     if (navigation.via !== "link") return;
-    const hash = decodeURIComponent(window.location.hash.slice(1));
+    const hash = decodeHash(window.location.hash.slice(1));
     const target = hash ? document.getElementById(hash) : null;
     if (target) target.scrollIntoView();
     else window.scrollTo(0, 0);
