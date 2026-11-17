@@ -57,6 +57,7 @@ module "branch_edge" {
   api_endpoint             = aws_apigatewayv2_api.branch[0].api_endpoint
   api_origin_secret        = local.api_origin_secret
   origin_access_control_id = var.origin_access_control_id
+  headers_policy           = "v1be-${var.episode}-headers"
 }
 
 # Only production is protected, so branch environments can be torn down. CI has
