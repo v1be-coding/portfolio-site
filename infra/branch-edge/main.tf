@@ -61,43 +61,12 @@ resource "aws_cloudfront_function" "pages" {
   JS
 }
 
-# Production's headers policy, copied so a branch environment is judged on the
-# same headers. A custom policy, because CloudFront's managed
-# SecurityHeadersPolicy adds x-xss-protection, which modern guidance leaves out.
-# Keep the CSP strict: the app bans style= in JSX so style-src can stay 'self'.
-resource "aws_cloudfront_response_headers_policy" "security" {
-  name    = "${var.bucket}-headers"
-  comment = "Security headers for ${var.comment}."
-
-  security_headers_config {
-    strict_transport_security {
-      access_control_max_age_sec = 31536000
-      include_subdomains         = true
-      override                   = true
-    }
-
-    content_type_options {
-      override = true
-    }
-
-    referrer_policy {
-      referrer_policy = "strict-origin-when-cross-origin"
-      override        = true
-    }
-
-    content_security_policy {
-      content_security_policy = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
-      override                = true
-    }
-  }
-
-  custom_headers_config {
-    items {
-      header   = "permissions-policy"
-      value    = "camera=(), microphone=(), geolocation=()"
-      override = true
-    }
-  }
+# Production's own headers policy, which v1be-infra creates for each `pages`
+# episode as v1be-<episode>-headers, so a branch environment is judged on exactly
+# the headers production sends. CI's role may read and attach it but not create
+# headers policies.
+data "aws_cloudfront_response_headers_policy" "security" {
+  name = var.headers_policy
 }
 
 resource "aws_s3_bucket" "site" {
@@ -175,7 +144,7 @@ resource "aws_cloudfront_distribution" "site" {
     allowed_methods            = ["GET", "HEAD"]
     cached_methods             = ["GET", "HEAD"]
     cache_policy_id            = data.aws_cloudfront_cache_policy.optimized.id
-    response_headers_policy_id = aws_cloudfront_response_headers_policy.security.id
+    response_headers_policy_id = data.aws_cloudfront_response_headers_policy.security.id
     compress                   = true
 
     function_association {
@@ -192,7 +161,7 @@ resource "aws_cloudfront_distribution" "site" {
     cached_methods             = ["GET", "HEAD"]
     cache_policy_id            = data.aws_cloudfront_cache_policy.disabled.id
     origin_request_policy_id   = data.aws_cloudfront_origin_request_policy.api.id
-    response_headers_policy_id = aws_cloudfront_response_headers_policy.security.id
+    response_headers_policy_id = data.aws_cloudfront_response_headers_policy.security.id
     compress                   = true
   }
 
