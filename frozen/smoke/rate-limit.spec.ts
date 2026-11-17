@@ -22,10 +22,14 @@ test("going over the per-IP limit gives a handled 429", async ({ unpacedRequest,
     retryAfterSeconds: retryAfter,
   });
 
-  // Every line that calls the API shows the message under a flood, so a page
-  // with more than one call shows it more than once (#42, attempt 1).
+  // The Chat panel shows the message when /api/health gets the 429 (spec #2).
+  // `.first()` because a page with more than one call can show it more than
+  // once (#42, attempt 1).
   await page.goto("/");
-  await expect(page.getByText(/Too many requests\. Try again in \d+ seconds\./).first()).toBeVisible();
+  await page.getByRole("button", { name: "Ask about Emiliano", exact: true }).click();
+  await expect(
+    page.getByRole("dialog", { name: "Ask about Emiliano" }).getByText(/Too many requests\. Try again in \d+ seconds\./).first(),
+  ).toBeVisible();
 
   // Wait out the window, so whatever runs next from this IP starts clean.
   await page.waitForTimeout((retryAfter + 1) * 1000);
