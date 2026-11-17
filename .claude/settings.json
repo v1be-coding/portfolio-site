@@ -1,0 +1,31 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -f /.dockerenv ] || { echo 'Episodes run only in the dev container (ADR-0012).' >&2; exit 2; }"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/git-guardrails.mjs\""
+          }
+        ]
+      }
+    ]
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "if [ -f /.dockerenv ]; then printf '\\033[30;42m CONTAINER \\033[0m'; else printf '\\033[37;41m WINDOWS: use the V1be Claude episode shortcut \\033[0m'; fi"
+  },
+  "permissions": {
+    "allow": ["Bash(gh pr merge * --auto --squash)"]
+  }
+}
