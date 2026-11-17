@@ -14,6 +14,92 @@ data "aws_cloudfront_origin_request_policy" "api" {
   name = "Managed-AllViewerExceptHostHeader"
 }
 
+# Clean URLs for prerendered pages, where each page is a folder's index.html.
+# Production's v1be-origin-check-pages does the same after its Cloudflare check,
+# which a branch environment can't pass (ADR-0010), so this is its own copy.
+# Function names are unique per account; the bucket name is unique per branch.
+#   /about/   -> 301 to /about, with the query string kept
+#   /about    -> /about/index.html, read from the bucket
+#   /app.js   -> unchanged, because the last segment has a dot
+resource "aws_cloudfront_function" "pages" {
+  name    = "${var.bucket}-pages"
+  runtime = "cloudfront-js-2.0"
+  comment = "Clean URLs for ${var.comment}."
+  publish = true
+
+  code = <<-JS
+    function queryString(qs) {
+      const parts = [];
+      // Runtime 2.0 has for and for-in, but not for-of.
+      for (var name in qs) {
+        var item = qs[name];
+        var values = item.multiValue ? item.multiValue : [item];
+        for (var i = 0; i < values.length; i++) {
+          parts.push(values[i].value === '' ? name : name + '=' + values[i].value);
+        }
+      }
+      return parts.length ? '?' + parts.join('&') : '';
+    }
+
+    function handler(event) {
+      const request = event.request;
+      const uri = request.uri;
+      if (uri.length > 1 && uri.endsWith('/')) {
+        const path = uri.replace(/\/+$/, '') || '/';
+        return {
+          statusCode: 301,
+          statusDescription: 'Moved Permanently',
+          headers: { location: { value: path + queryString(request.querystring) } },
+        };
+      }
+      const last = uri.substring(uri.lastIndexOf('/') + 1);
+      if (uri !== '/' && last.indexOf('.') === -1) {
+        request.uri = uri + '/index.html';
+      }
+      return request;
+    }
+  JS
+}
+
+# Production's headers policy, copied so a branch environment is judged on the
+# same headers. A custom policy, because CloudFront's managed
+# SecurityHeadersPolicy adds x-xss-protection, which modern guidance leaves out.
+# Keep the CSP strict: the app bans style= in JSX so style-src can stay 'self'.
+resource "aws_cloudfront_response_headers_policy" "security" {
+  name    = "${var.bucket}-headers"
+  comment = "Security headers for ${var.comment}."
+
+  security_headers_config {
+    strict_transport_security {
+      access_control_max_age_sec = 31536000
+      include_subdomains         = true
+      override                   = true
+    }
+
+    content_type_options {
+      override = true
+    }
+
+    referrer_policy {
+      referrer_policy = "strict-origin-when-cross-origin"
+      override        = true
+    }
+
+    content_security_policy {
+      content_security_policy = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+      override                = true
+    }
+  }
+
+  custom_headers_config {
+    items {
+      header   = "permissions-policy"
+      value    = "camera=(), microphone=(), geolocation=()"
+      override = true
+    }
+  }
+}
+
 resource "aws_s3_bucket" "site" {
   bucket        = var.bucket
   force_destroy = true
@@ -84,23 +170,45 @@ resource "aws_cloudfront_distribution" "site" {
   }
 
   default_cache_behavior {
-    target_origin_id       = "site"
-    viewer_protocol_policy = "redirect-to-https"
-    allowed_methods        = ["GET", "HEAD"]
-    cached_methods         = ["GET", "HEAD"]
-    cache_policy_id        = data.aws_cloudfront_cache_policy.optimized.id
-    compress               = true
+    target_origin_id           = "site"
+    viewer_protocol_policy     = "redirect-to-https"
+    allowed_methods            = ["GET", "HEAD"]
+    cached_methods             = ["GET", "HEAD"]
+    cache_policy_id            = data.aws_cloudfront_cache_policy.optimized.id
+    response_headers_policy_id = aws_cloudfront_response_headers_policy.security.id
+    compress                   = true
+
+    function_association {
+      event_type   = "viewer-request"
+      function_arn = aws_cloudfront_function.pages.arn
+    }
   }
 
   ordered_cache_behavior {
-    path_pattern             = "/api/*"
-    target_origin_id         = "api"
-    viewer_protocol_policy   = "https-only"
-    allowed_methods          = ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]
-    cached_methods           = ["GET", "HEAD"]
-    cache_policy_id          = data.aws_cloudfront_cache_policy.disabled.id
-    origin_request_policy_id = data.aws_cloudfront_origin_request_policy.api.id
-    compress                 = true
+    path_pattern               = "/api/*"
+    target_origin_id           = "api"
+    viewer_protocol_policy     = "https-only"
+    allowed_methods            = ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]
+    cached_methods             = ["GET", "HEAD"]
+    cache_policy_id            = data.aws_cloudfront_cache_policy.disabled.id
+    origin_request_policy_id   = data.aws_cloudfront_origin_request_policy.api.id
+    response_headers_policy_id = aws_cloudfront_response_headers_policy.security.id
+    compress                   = true
+  }
+
+  # A missing page is a 403 from the private bucket, so both map to the 404 page,
+  # which keeps its no-cache metadata. As in production, this covers the whole
+  # distribution, so an API 403 or 404 also gets the page. The TTL is short so a
+  # page that a later deploy adds isn't hidden behind a cached 404.
+  dynamic "custom_error_response" {
+    for_each = [403, 404]
+
+    content {
+      error_code            = custom_error_response.value
+      response_code         = 404
+      response_page_path    = "/404.html"
+      error_caching_min_ttl = 10
+    }
   }
 
   restrictions {

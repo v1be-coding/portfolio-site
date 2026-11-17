@@ -5,7 +5,24 @@ import { guardRequest } from "../limits/guard.js";
 const NOTE_PATH = /^\/api\/notes\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/;
 const MAX_TEXT_LENGTH = 1000;
 
+// Added here, around every route and the guard, so no response can miss them.
+// The API answers per caller and may hold personal data, so nothing caches it.
+const API_HEADERS = { "cache-control": "no-store", "x-content-type-options": "nosniff" };
+
 export async function handler(event: APIGatewayProxyEventV2): Promise<APIGatewayProxyResultV2> {
+  return withApiHeaders(await route(event));
+}
+
+function withApiHeaders(response: APIGatewayProxyResultV2): APIGatewayProxyResultV2 {
+  // A bare string or object is a 200 JSON body to API Gateway; wrap it so it
+  // can carry headers too.
+  if (typeof response !== "object" || !("statusCode" in response)) {
+    return withApiHeaders(json(200, response));
+  }
+  return { ...response, headers: { ...response.headers, ...API_HEADERS } };
+}
+
+async function route(event: APIGatewayProxyEventV2): Promise<APIGatewayProxyResultV2> {
   const refused = await guardRequest(event);
   if (refused) return refused;
 
