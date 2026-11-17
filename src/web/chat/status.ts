@@ -1,17 +1,25 @@
 // What the panel's status region says. Every failure the Chat can meet arrives
 // here as an error from ./chat-api.ts, so this is the one place that maps them to
 // text.
-import { limitMessage, RateLimitedError } from "../api.js";
+import { ApiError, limitMessage, RateLimitedError } from "../api.js";
 
 export type Health = "checking" | "ok" | { error: unknown };
 
 export type StatusInput = { health: Health; pending: boolean; sendError: unknown };
 
-export function statusText({ health, pending, sendError }: StatusInput): string {
-  if (typeof health === "object") return healthFailureText(health.error);
-  if (pending) return "Thinking…";
-  if (sendError) return sendFailureText(sendError);
-  return "";
+// `offerEmail` asks the panel to add an "Email me instead" link: the only way
+// left to reach Emiliano once the AI feature has paused for the day.
+export type ChatStatus = { text: string; offerEmail: boolean };
+
+export function chatStatus({ health, pending, sendError }: StatusInput): ChatStatus {
+  if (typeof health === "object") return plain(healthFailureText(health.error));
+  if (pending) return plain("Thinking…");
+  if (sendError) return sendFailureStatus(sendError);
+  return plain("");
+}
+
+function plain(text: string): ChatStatus {
+  return { text, offerEmail: false };
 }
 
 function healthFailureText(error: unknown): string {
@@ -20,8 +28,12 @@ function healthFailureText(error: unknown): string {
     : "The Chat is unavailable right now.";
 }
 
-function sendFailureText(error: unknown): string {
-  return error instanceof RateLimitedError
-    ? limitMessage(error)
-    : "Your message didn't send. Try again.";
+function sendFailureStatus(error: unknown): ChatStatus {
+  if (error instanceof RateLimitedError) {
+    return { text: limitMessage(error), offerEmail: error.reason === "daily_cap" };
+  }
+  if (error instanceof ApiError && error.code === "ai_busy") {
+    return plain("The Chat is busy right now. Try again in a minute.");
+  }
+  return plain("Your message didn't send. Try again.");
 }

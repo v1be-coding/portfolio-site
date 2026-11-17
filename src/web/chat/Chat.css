@@ -177,6 +177,11 @@
   font-size: var(--text-meta);
 }
 
+/* "Email me instead" reads as one target, so it moves to the next line whole. */
+.chat-status a {
+  white-space: nowrap;
+}
+
 .chat-start-over {
   align-self: flex-start;
   min-height: 44px;

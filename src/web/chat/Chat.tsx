@@ -10,7 +10,8 @@ import {
 import { flushSync } from "react-dom";
 import { askChat, checkHealth } from "./chat-api.js";
 import { conversationReducer, INITIAL_CONVERSATION, isFull, type Message } from "./conversation.js";
-import { statusText, type Health } from "./status.js";
+import { content } from "../../content/content.js";
+import { chatStatus, type ChatStatus, type Health } from "./status.js";
 import "./Chat.css";
 
 const NAME = "Ask about Emiliano";
@@ -47,6 +48,7 @@ export function Chat() {
   const full = isFull(messages);
   const ready = health === "ok" && !full;
   const canSend = ready && !pending && draft.trim() !== "";
+  const status = chatStatus({ health, pending, sendError: conversation.sendError });
 
   // Focus goes to the textbox when it can take it. Until the health check passes
   // it waits on the panel itself, and the effect below moves it on.
@@ -191,11 +193,7 @@ export function Chat() {
           </ul>
         )}
         <div className="chat-status" role="status">
-          {full ? (
-            <p>This conversation is full.</p>
-          ) : (
-            statusText({ health, pending, sendError: conversation.sendError })
-          )}
+          {full ? <p>This conversation is full.</p> : <StatusMessage status={status} />}
         </div>
         {full && (
           <button ref={startOverRef} type="button" className="chat-start-over" onClick={startOver}>
@@ -221,6 +219,15 @@ export function Chat() {
         </form>
       </div>
     </aside>
+  );
+}
+
+function StatusMessage({ status }: { status: ChatStatus }) {
+  if (!status.offerEmail) return status.text;
+  return (
+    <>
+      {status.text} <a href={`mailto:${content.profile.email}`}>Email me instead</a>
+    </>
   );
 }
 

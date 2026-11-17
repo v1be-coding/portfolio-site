@@ -31,6 +31,19 @@ describe("api", () => {
     expect(error).toMatchObject({ retryAfterSeconds: 42, reason: "rate_limited" });
   });
 
+  it("takes the chat limit's wait from its body", async () => {
+    respond(
+      429,
+      '{"error":"chat_rate_limited","message":"Too many questions. Try again in 42 seconds.","retryAfterSeconds":42}',
+      { "retry-after": "40" },
+    );
+
+    await expect(api("/api/chat")).rejects.toMatchObject({
+      retryAfterSeconds: 42,
+      reason: "chat_rate_limited",
+    });
+  });
+
   it("copes with a 429 that isn't JSON, such as Cloudflare's", async () => {
     respond(429, "<html>blocked</html>");
 
@@ -38,6 +51,12 @@ describe("api", () => {
       retryAfterSeconds: 60,
       reason: "unknown",
     });
+  });
+
+  it("keeps the app's error code from a failure's body", async () => {
+    respond(503, '{"error":"ai_busy","message":"The AI is busy. Try again in a minute."}');
+
+    await expect(api("/api/chat")).rejects.toMatchObject({ status: 503, code: "ai_busy" });
   });
 
   it("reports other failures with their status", async () => {
@@ -71,6 +90,12 @@ describe("limitMessage", () => {
   it("tells a limited visitor when to try again", () => {
     expect(limitMessage(new RateLimitedError(42, "rate_limited"))).toBe(
       "Too many requests. Try again in 42 seconds.",
+    );
+  });
+
+  it("names questions for the chat limit", () => {
+    expect(limitMessage(new RateLimitedError(42, "chat_rate_limited"))).toBe(
+      "Too many questions. Try again in 42 seconds.",
     );
   });
 
