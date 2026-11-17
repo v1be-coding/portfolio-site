@@ -32,6 +32,48 @@ describe("handler", () => {
     expect(putNote).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ["a route's answer", () => request("GET", "/api/health")],
+    ["a 404", () => request("GET", "/nope")],
+    ["a 405", () => request("POST", "/api/notes/count")],
+  ])("sends no-store and nosniff on %s", async (_name, make) => {
+    const response = await handler(make());
+
+    expect(response).toMatchObject({
+      headers: { "cache-control": "no-store", "x-content-type-options": "nosniff" },
+    });
+  });
+
+  it("sends no-store and nosniff on the guard's refusal, keeping its own headers", async () => {
+    vi.mocked(guardRequest).mockResolvedValue({
+      statusCode: 429,
+      headers: { "retry-after": "30" },
+      body: "{}",
+    });
+
+    const response = await handler(request("GET", "/api/health"));
+
+    expect(response).toMatchObject({
+      statusCode: 429,
+      headers: {
+        "retry-after": "30",
+        "cache-control": "no-store",
+        "x-content-type-options": "nosniff",
+      },
+    });
+  });
+
+  it("sends no-store and nosniff on a guard refusal that has no headers", async () => {
+    vi.mocked(guardRequest).mockResolvedValue({ statusCode: 403, body: "" });
+
+    const response = await handler(request("GET", "/api/health"));
+
+    expect(response).toMatchObject({
+      statusCode: 403,
+      headers: { "cache-control": "no-store", "x-content-type-options": "nosniff" },
+    });
+  });
+
   it("returns 404 for anything else", async () => {
     const response = await handler(request("GET", "/nope"));
 
