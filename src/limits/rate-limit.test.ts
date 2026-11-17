@@ -42,6 +42,23 @@ describe("checkRateLimit", () => {
     });
   });
 
+  it("keeps a separate count for each named limit", async () => {
+    const { db, send } = storeReturning(1);
+
+    await checkRateLimit(db, "limits", "abc", now, {
+      name: "chat",
+      requests: 20,
+      windowSeconds: 3600,
+    });
+
+    const command = send.mock.calls[0]?.[0] as UpdateItemCommand;
+    const windowStart = Date.UTC(2026, 10, 7, 12, 0, 0) / 1000;
+    expect(command.input).toMatchObject({
+      Key: { pk: { S: `chat#abc#${windowStart}` } },
+      ExpressionAttributeValues: { ":expires": { N: String(windowStart + 7200) } },
+    });
+  });
+
   it("never asks a caller to wait less than a second", async () => {
     const { db } = storeReturning(RATE_LIMIT.requests + 1);
     const lastMoment = Date.UTC(2026, 10, 7, 12, 0, 59, 900);
