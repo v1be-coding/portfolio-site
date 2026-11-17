@@ -18,7 +18,7 @@ export async function guardRequest(
     return { statusCode: 403, body: "" };
   }
 
-  const ipHash = hashIp(clientIp(event, config.ipSource), config.originSecret);
+  const ipHash = callerHash(event);
   try {
     const result = await checkRateLimit(db, config.table, ipHash);
     if (result.allowed) return undefined;
@@ -41,6 +41,13 @@ export async function guardRequest(
     console.error("Rate limit check failed", error);
     return undefined;
   }
+}
+
+// The keyed hash a route's own limits count by, the same one guardRequest uses.
+// Only meaningful after guardRequest has let the request through.
+export function callerHash(event: APIGatewayProxyEventV2): string {
+  const config = limitsConfig();
+  return hashIp(clientIp(event, config.ipSource), config.originSecret);
 }
 
 // What an AI route returns when withSpendCap says no. The rest of the app keeps

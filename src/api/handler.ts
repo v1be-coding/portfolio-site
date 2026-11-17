@@ -1,6 +1,7 @@
 import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from "aws-lambda";
 import { countNotes, getNote, putNote } from "../db/notes.js";
-import { guardRequest } from "../limits/guard.js";
+import { chatRoute } from "../chat/chat.js";
+import { callerHash, guardRequest } from "../limits/guard.js";
 
 const NOTE_PATH = /^\/api\/notes\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/;
 const MAX_TEXT_LENGTH = 1000;
@@ -28,6 +29,14 @@ async function route(event: APIGatewayProxyEventV2): Promise<APIGatewayProxyResu
 
   if (event.rawPath === "/api/health") {
     return json(200, { status: "ok" });
+  }
+
+  if (event.rawPath === "/api/chat") {
+    return chatRoute({
+      method: event.requestContext.http.method,
+      body: decodedBody(event),
+      callerHash: callerHash(event),
+    });
   }
 
   if (event.rawPath === "/api/notes/count") {
@@ -75,6 +84,12 @@ async function notesRoute(
   }
 
   return json(405, { error: "Method not allowed" });
+}
+
+// API Gateway base64-encodes a body whose content type it doesn't treat as text.
+function decodedBody(event: APIGatewayProxyEventV2): string | undefined {
+  if (event.body === undefined || !event.isBase64Encoded) return event.body;
+  return Buffer.from(event.body, "base64").toString("utf8");
 }
 
 function readText(body: string | undefined): string | undefined {
