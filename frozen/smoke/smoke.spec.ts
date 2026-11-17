@@ -3,13 +3,15 @@ import { expect, test } from "../helpers/fixtures.js";
 test("the page loads in a real browser", async ({ page }) => {
   await page.goto("/");
 
-  await expect(page.getByRole("heading", { name: "V1be Coding" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Emiliano Casi Jr" })).toBeVisible();
 });
 
 test("the API answers through the page", async ({ page }) => {
   await page.goto("/");
 
-  await expect(page.getByText("API: ok")).toBeVisible();
+  // The Chat's textbox is enabled once /api/health succeeds (spec #2).
+  await page.getByRole("button", { name: "Ask about Emiliano", exact: true }).click();
+  await expect(page.getByRole("textbox", { name: "Your question" })).toBeEnabled();
 });
 
 test("a write and a read reach the database", async ({ request }) => {

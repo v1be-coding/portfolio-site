@@ -30,6 +30,14 @@ describe("the frozen lint", () => {
     assert.deepEqual(messages(text), []);
   });
 
+  it("allows property names that only exist on Object.prototype, such as toString", () => {
+    const text = `test("reads bytes", async ({ request }) => {
+      expect((await request.get("/")).headers().toString()).not.toBe("");
+      expect({}.constructor).toBeDefined();
+    });`;
+    assert.deepEqual(messages(text), []);
+  });
+
   for (const [name, body, expected] of [
     ["if", "if (x) await expect(a).toBe(1);", "`if`"],
     ["a ternary", "await expect(x ? a : b).toBe(1);", "`?:`"],

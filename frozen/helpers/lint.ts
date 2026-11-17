@@ -53,7 +53,7 @@ export function lintSource(file: string, text: string): Finding[] {
     if (ts.isReturnStatement(node)) report(node, "`return` can end a test before its assertions");
     if (ts.isPropertyAccessExpression(node)) {
       const name = node.name.text;
-      const banned = BANNED_MODIFIERS[name];
+      const banned = Object.hasOwn(BANNED_MODIFIERS, name) ? BANNED_MODIFIERS[name] : undefined;
       if (banned) report(node.name, banned);
       if (LOOSE_MATCHERS.has(name) && isExpectOrNot(node.expression)) {
         report(node.name, `\`expect.${name}\` lets a value through unchecked: prove it real, then use it in \`toEqual\``);
