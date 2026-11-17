@@ -1,16 +1,25 @@
-/* The page frame: one column below 1024px; from 1024px a left column that stays
-   put while the right column scrolls (spec #2, Design → Layout). */
+/* The page frame (spec #2, Design → Layout): one column below 1024px; from
+   1024px a left column that stays put while the right column scrolls. */
+
+/* Tab scrolls a focused element into view only as far as the viewport's edge,
+   which is where the fixed Chat tab sits. Padding the scrollport keeps every
+   focused element above it (C56), and gives #about etc. a little headroom. */
+html {
+  scroll-padding-block: var(--space-6) var(--chat-clearance);
+}
 
 .shell {
   max-width: 1200px;
   margin-inline: auto;
   padding-inline: var(--gutter);
-  padding-block: var(--space-12);
+  padding-block: var(--space-12) var(--chat-clearance);
 }
 
 .shell-main {
   max-width: var(--measure);
+  margin-block-start: var(--space-12);
   padding-block-start: var(--space-12);
+  border-block-start: 1px solid var(--color-divider);
 }
 
 .skip-link {
@@ -28,24 +37,45 @@
 
 /* Off screen until focused, so it is still the first Tab stop. */
 .skip-link:not(:focus) {
-  position: absolute;
   width: 1px;
   height: 1px;
+  padding: 0;
   overflow: hidden;
   clip-path: inset(50%);
   white-space: nowrap;
 }
 
+/* ---------------------------------------------------------------- Left column */
+
 .site-header {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-8);
+}
+
+.site-header ul {
+  padding: 0;
+  list-style: none;
+}
+
+.site-intro {
+  display: flex;
+  flex-direction: column;
 }
 
 .site-name {
   font-size: var(--text-name);
   font-weight: var(--weight-bold);
   line-height: var(--leading-heading);
+  letter-spacing: -0.02em;
+  /* Keeps "Jr" from sitting alone on a line at 320px. */
+  text-wrap: balance;
+}
+
+/* Off the home page the page's own h1 leads, so the name steps down to the
+   section-heading size instead of competing with it. */
+p.site-name {
+  font-size: var(--text-heading);
 }
 
 .site-name a {
@@ -54,18 +84,105 @@
 }
 
 .site-name a:hover {
-  text-decoration: underline;
+  color: var(--color-accent);
 }
 
 .site-tagline {
+  margin-block-start: var(--space-3);
   font-size: var(--text-title);
-  max-width: 32ch;
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-heading);
+  max-width: 30ch;
 }
 
 .site-availability {
+  margin-block-start: var(--space-4);
   color: var(--color-muted);
   max-width: 40ch;
 }
+
+/* Site nav: the two pages as a short row, the current one marked by a solid
+   accent rule under it, the other by the divider colour. */
+.site-nav {
+  margin-block-start: var(--space-6);
+}
+
+.site-nav ul {
+  display: flex;
+  gap: var(--space-6);
+}
+
+.site-nav a {
+  display: inline-block;
+  padding-block: var(--space-1);
+  border-block-end: 2px solid var(--color-divider);
+  color: var(--color-muted);
+  font-weight: var(--weight-bold);
+  text-decoration: none;
+  transition-property: color, border-color;
+}
+
+.site-nav a:hover {
+  color: var(--color-text);
+  border-color: var(--color-muted);
+}
+
+.site-nav a[aria-current="page"] {
+  color: var(--color-text);
+  border-color: var(--color-accent);
+}
+
+/* "On this page": a wrapping row on small screens, a vertical index with a
+   leading rule on wide ones. */
+.section-nav ul {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: var(--space-6);
+  row-gap: var(--space-2);
+}
+
+.section-nav a {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding-block: var(--space-1);
+  color: var(--color-muted);
+  text-decoration: none;
+}
+
+.section-nav a:hover {
+  color: var(--color-text);
+}
+
+.site-contact {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: var(--space-6);
+  row-gap: var(--space-3);
+}
+
+.site-contact a {
+  display: inline-block;
+  padding-block: var(--space-1);
+}
+
+/* The one filled-in action in the column: the resume is what a recruiter came
+   for. */
+.site-contact .site-resume {
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-small);
+  font-weight: var(--weight-bold);
+  text-decoration: none;
+}
+
+.site-contact .site-resume:hover {
+  background-color: var(--color-accent);
+  color: var(--color-on-accent);
+}
+
+/* ---------------------------------------------------------------- Wide */
 
 @media (min-width: 1024px) {
   .shell {
@@ -80,11 +197,39 @@
     position: sticky;
     top: 0;
     align-self: start;
-    max-height: 100vh;
-    padding-block: var(--space-24);
+    height: 100vh;
+    height: 100dvh;
+    /* A short window still reaches the contact links. */
+    overflow-y: auto;
+    padding-block: var(--space-24) var(--space-12);
+  }
+
+  .section-nav ul {
+    flex-direction: column;
+    row-gap: var(--space-1);
+  }
+
+  .section-nav a::before {
+    content: "";
+    inline-size: var(--space-8);
+    block-size: 2px;
+    background-color: var(--color-divider);
+    transition: background-color var(--motion-duration) var(--motion-easing);
+  }
+
+  .section-nav a:hover::before,
+  .section-nav a:focus-visible::before {
+    background-color: var(--color-accent);
+  }
+
+  /* Contact links sit at the foot of the column, under the index. */
+  .site-contact {
+    margin-block-start: auto;
   }
 
   .shell-main {
+    margin-block-start: 0;
     padding-block: var(--space-24);
+    border-block-start: 0;
   }
 }
