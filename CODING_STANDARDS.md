@@ -58,3 +58,21 @@ Outside the diff, flag a comment the change made false: when the diff changes wh
 Don't flag a comment that gives a reason (a constraint, a workaround, an invariant). Don't flag the style of comments the diff didn't touch.
 
 Why: the next agent believes comments over code.
+
+### The first render matches the prerendered HTML
+
+Pages are prerendered at build time and hydrated in the browser, so a component's first render must give the same output in both places. Flag anything that reads browser-only or time-dependent values during render: `new Date()`, `toLocale*String()`, `window`, `document`, `navigator`, `location`, `localStorage`, `matchMedia`, `typeof window`, or `import.meta.env.SSR`. The lint's `purity` rule only catches `Date.now`, `performance.now` and `Math.random`. Also flag initial state that differs between the build and the browser, and any `suppressHydrationWarning`.
+
+- Bad: `const [dark] = useState(matchMedia("(prefers-color-scheme: dark)").matches)`; `{typeof window !== "undefined" && <ChatTab />}`
+- Good: theme from a CSS `prefers-color-scheme` media query; browser-only reads in `useEffect` or an event handler; browser-only UI behind `use(browser())` inside `<Suspense>`
+
+Why: in production React 19 doesn't log or repair a mismatched attribute, so the build's value silently stays in the DOM. No frozen test catches that, so review has to. A text mismatch does surface, as page error #418, but only after it has failed a run.
+
+### Effects survive running twice and never throw
+
+An effect that fetches needs a cleanup that ignores stale results, and it must handle failure by rendering a state, not by throwing.
+
+- Bad: `useEffect(() => { fetch("/api/health").then(r => r.json()).then(setStatus) }, [])`
+- Good: an `ignore` flag or `AbortController` in the cleanup, and a `.catch` that sets a failure state (an abort included)
+
+Why: Strict Mode runs effects twice in development, hydration included, so a fetch with no cleanup races itself. In production, an unhandled rejection (a network error or an abort) becomes a page error, which fails the frozen console check.

@@ -31,4 +31,11 @@ Each file's git blob hash matched upstream's at that commit when copied, so
 same way. Use it in the spec phase to learn how a library or technique behaves in
 real use: bugs, workarounds, what helps. Use `research` for documented facts.
 
+`frontend-design` is from [anthropics/skills](https://github.com/anthropics/skills) at commit
+`41bbe19d1a1a7eaab5e7bb9050a417e5c6cffc8f`, copied unedited on 2026-11-17 under its
+Apache 2.0 licence in [frontend-design/LICENSE.txt](./frontend-design/LICENSE.txt)
+(git blobs: `SKILL.md` `a5333457c414d20d625f307df945842c0952ecc3`, `LICENSE.txt`
+`f433b1a53f5b830a205fd2df78e2b34974656c7b`). The portfolio-site spec (#2) has the
+run use it for the token plan, then the build, then a screenshot self-critique.
+
 `/attempt` and `/acceptance` are this repo's own, in `.claude/commands/`.
