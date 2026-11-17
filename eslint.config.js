@@ -40,7 +40,7 @@ export default defineConfig(
   { files: ["src/web/prerender.tsx"], languageOptions: { globals: globals.node } },
   {
     files: [
-      "src/{ai,api,db,limits}/**/*.ts",
+      "src/{ai,api,db,limits,resume}/**/*.ts",
       "*.config.{ts,js}",
       ".claude/**/*.mjs",
       "scripts/**/*.mjs",
