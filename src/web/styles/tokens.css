@@ -1,0 +1,74 @@
+/* Design tokens, direction B "Forest" (spec #2, Design). Every colour, size,
+   space, radius, shadow and motion value on the site comes from here. The theme
+   follows the system setting only: no toggle, no JavaScript. */
+
+:root {
+  color-scheme: light dark;
+
+  /* Colour */
+  --color-bg: #ffffff;
+  --color-text: #1a1f1c;
+  --color-muted: #55605a;
+  --color-divider: #dce3de;
+  --color-accent: #1e6a49;
+  /* Text on an accent fill, such as the Chat tab. */
+  --color-on-accent: #ffffff;
+  /* The Experience hover highlight: the accent at low strength over the page. */
+  --color-highlight: color-mix(in srgb, var(--color-accent) 7%, var(--color-bg));
+
+  /* Type */
+  --font-sans: "Atkinson Hyperlegible Next", system-ui, sans-serif;
+  --text-meta: 0.875rem; /* dates and meta */
+  --text-body: 1rem;
+  --text-title: 1.125rem; /* Experience titles */
+  --text-heading: 1.5rem; /* section headings */
+  --text-name: 2.5rem; /* the name */
+  --leading-body: 1.6;
+  --leading-heading: 1.2;
+  --weight-regular: 400;
+  --weight-bold: 700;
+  --measure: 68ch;
+
+  /* Spacing: multiples of 4px */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-24: 96px;
+
+  /* Shape */
+  --radius-small: 4px; /* buttons, inputs, the Chat tab */
+  --radius-large: 12px; /* the Chat panel, the Experience hover highlight */
+  /* The only shadow on the site, for the Chat panel. */
+  --shadow-panel: 0 12px 32px rgb(15 20 18 / 0.18);
+
+  /* Focus */
+  --focus-ring-width: 2px;
+  --focus-ring-offset: 2px;
+
+  /* Motion: colour and background only */
+  --motion-duration: 150ms;
+  --motion-easing: ease-out;
+
+  /* Layout */
+  --breakpoint-wide: 1024px; /* documentation only: media queries can't read it */
+  --gutter: var(--space-4);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg: #0f1412;
+    --color-text: #e5ece8;
+    --color-muted: #9ca9a2;
+    --color-divider: #26302b;
+    --color-accent: #72d1a2;
+    --color-on-accent: #0f1412;
+    --shadow-panel: 0 12px 32px rgb(0 0 0 / 0.5);
+  }
+}

@@ -1,0 +1,143 @@
+/* Site-wide base styles. Component styles live next to their components. */
+@import "./tokens.css";
+
+/* Self-hosted, latin subset (it covers every character in the content,
+   including the en dash). No third-party font requests (spec #2, Font). */
+@font-face {
+  font-family: "Atkinson Hyperlegible Next";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../fonts/atkinson-hyperlegible-next-400.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Atkinson Hyperlegible Next";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("../fonts/atkinson-hyperlegible-next-700.woff2") format("woff2");
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: var(--text-body);
+  font-weight: var(--weight-regular);
+  line-height: var(--leading-body);
+  overflow-wrap: break-word;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  margin: 0;
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-heading);
+}
+
+h1 {
+  font-size: var(--text-name);
+}
+
+h2 {
+  font-size: var(--text-heading);
+}
+
+h3 {
+  font-size: var(--text-title);
+}
+
+h4 {
+  font-size: var(--text-body);
+}
+
+p,
+ul,
+ol {
+  margin: 0;
+}
+
+img,
+svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+a {
+  color: var(--color-accent);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+}
+
+a:hover {
+  text-decoration-thickness: 2px;
+}
+
+a,
+button {
+  transition-property: color, background-color;
+  transition-duration: var(--motion-duration);
+  transition-timing-function: var(--motion-easing);
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: var(--focus-ring-width) solid var(--color-accent);
+  outline-offset: var(--focus-ring-offset);
+}
+
+/* <main> takes focus only programmatically (skip link, in-place navigation), so a
+   ring around the whole page would only be noise. */
+main:focus {
+  outline: none;
+}
+
+/* Read by screen readers, not shown: the Chat's "You: " and "Assistant: " prefixes. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Visitors who ask for less motion get none: every transition and animation
+   computes to 0s (spec #2, Reduced motion). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0s !important;
+    transition-delay: 0s !important;
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
+}
