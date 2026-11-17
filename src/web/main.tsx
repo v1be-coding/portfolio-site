@@ -1,31 +1,15 @@
-import { StrictMode, useEffect, useState } from "react";
-import { createRoot } from "react-dom/client";
-import { api, failureText } from "./api.js";
+import { createRoot, hydrateRoot } from "react-dom/client";
+import { Root } from "./App.js";
+import { routeFor } from "./routes.js";
 
-function App() {
-  const [status, setStatus] = useState("checking");
-  const [notesSaved, setNotesSaved] = useState("checking");
+const container = document.getElementById("root")!;
 
-  useEffect(() => {
-    api<{ status: string }>("/api/health")
-      .then((body) => setStatus(body.status))
-      .catch((error: unknown) => setStatus(failureText(error)));
-    api<{ count: number }>("/api/notes/count")
-      .then((body) => setNotesSaved(String(body.count)))
-      .catch((error: unknown) => setNotesSaved(failureText(error)));
-  }, []);
+// The prerender records which route it rendered into this file, and the first
+// client render must use the same one. The URL alone can't say: the 404 page is
+// served at any unknown path, and the host may add or drop a trailing slash.
+const renderedPath = container.dataset.path;
+const route = routeFor(renderedPath?.startsWith("/") ? renderedPath : window.location.pathname);
 
-  return (
-    <main>
-      <h1>V1be Coding</h1>
-      <p>API: {status}</p>
-      <p>Notes saved: {notesSaved}</p>
-    </main>
-  );
-}
-
-createRoot(document.getElementById("root")!).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
-);
+// `vite dev` serves the bare template, with nothing to hydrate.
+if (container.hasChildNodes()) hydrateRoot(container, <Root initialRoute={route} />);
+else createRoot(container).render(<Root initialRoute={route} />);

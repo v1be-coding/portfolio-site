@@ -1,0 +1,90 @@
+/* The page frame: one column below 1024px; from 1024px a left column that stays
+   put while the right column scrolls (spec #2, Design → Layout). */
+
+.shell {
+  max-width: 1200px;
+  margin-inline: auto;
+  padding-inline: var(--gutter);
+  padding-block: var(--space-12);
+}
+
+.shell-main {
+  max-width: var(--measure);
+  padding-block-start: var(--space-12);
+}
+
+.skip-link {
+  position: absolute;
+  top: var(--space-2);
+  left: var(--space-2);
+  z-index: 10;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-small);
+  background-color: var(--color-accent);
+  color: var(--color-on-accent);
+  font-weight: var(--weight-bold);
+  text-decoration: none;
+}
+
+/* Off screen until focused, so it is still the first Tab stop. */
+.skip-link:not(:focus) {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.site-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.site-name {
+  font-size: var(--text-name);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-heading);
+}
+
+.site-name a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.site-name a:hover {
+  text-decoration: underline;
+}
+
+.site-tagline {
+  font-size: var(--text-title);
+  max-width: 32ch;
+}
+
+.site-availability {
+  color: var(--color-muted);
+  max-width: 40ch;
+}
+
+@media (min-width: 1024px) {
+  .shell {
+    display: grid;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+    gap: var(--space-16);
+    padding-inline: var(--space-12);
+    padding-block: 0;
+  }
+
+  .site-header {
+    position: sticky;
+    top: 0;
+    align-self: start;
+    max-height: 100vh;
+    padding-block: var(--space-24);
+  }
+
+  .shell-main {
+    padding-block: var(--space-24);
+  }
+}
