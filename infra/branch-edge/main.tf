@@ -15,50 +15,15 @@ data "aws_cloudfront_origin_request_policy" "api" {
 }
 
 # Clean URLs for prerendered pages, where each page is a folder's index.html.
-# Production's v1be-origin-check-pages does the same after its Cloudflare check,
-# which a branch environment can't pass (ADR-0010), so this is its own copy.
-# Function names are unique per account; the bucket name is unique per branch.
+# v1be-infra owns this shared function (production's copy also checks for
+# Cloudflare, which a branch environment can't pass, ADR-0010). CI may only
+# read and attach it.
 #   /about/   -> 301 to /about, with the query string kept
 #   /about    -> /about/index.html, read from the bucket
 #   /app.js   -> unchanged, because the last segment has a dot
-resource "aws_cloudfront_function" "pages" {
-  name    = "${var.bucket}-pages"
-  runtime = "cloudfront-js-2.0"
-  comment = "Clean URLs for ${var.comment}."
-  publish = true
-
-  code = <<-JS
-    function queryString(qs) {
-      const parts = [];
-      // Runtime 2.0 has for and for-in, but not for-of.
-      for (var name in qs) {
-        var item = qs[name];
-        var values = item.multiValue ? item.multiValue : [item];
-        for (var i = 0; i < values.length; i++) {
-          parts.push(values[i].value === '' ? name : name + '=' + values[i].value);
-        }
-      }
-      return parts.length ? '?' + parts.join('&') : '';
-    }
-
-    function handler(event) {
-      const request = event.request;
-      const uri = request.uri;
-      if (uri.length > 1 && uri.endsWith('/')) {
-        const path = uri.replace(/\/+$/, '') || '/';
-        return {
-          statusCode: 301,
-          statusDescription: 'Moved Permanently',
-          headers: { location: { value: path + queryString(request.querystring) } },
-        };
-      }
-      const last = uri.substring(uri.lastIndexOf('/') + 1);
-      if (uri !== '/' && last.indexOf('.') === -1) {
-        request.uri = uri + '/index.html';
-      }
-      return request;
-    }
-  JS
+data "aws_cloudfront_function" "pages" {
+  name  = "v1be-pages"
+  stage = "LIVE"
 }
 
 # Production's own headers policy, which v1be-infra creates for each `pages`
@@ -149,7 +114,7 @@ resource "aws_cloudfront_distribution" "site" {
 
     function_association {
       event_type   = "viewer-request"
-      function_arn = aws_cloudfront_function.pages.arn
+      function_arn = data.aws_cloudfront_function.pages.arn
     }
   }
 
