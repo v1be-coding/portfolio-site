@@ -59,6 +59,9 @@
   /* Layout */
   --breakpoint-wide: 1024px; /* documentation only: media queries can't read it */
   --gutter: var(--space-4);
+  /* Room the fixed Chat tab (up to 48px tall, 16px off the bottom edge) needs
+     below a tab stop, plus 16px of air, so focus never lands under it (C56). */
+  --chat-clearance: calc(var(--space-16) + var(--space-4) + env(safe-area-inset-bottom, 0px));
 }
 
 @media (prefers-color-scheme: dark) {
