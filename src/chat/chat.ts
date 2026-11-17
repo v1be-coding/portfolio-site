@@ -1,4 +1,5 @@
 import type { APIGatewayProxyResultV2 } from "aws-lambda";
+import { json, tooManyRequests } from "../api/responses.js";
 import { claude, classifyClaudeError } from "../ai/claude.js";
 import { content } from "../content/content.js";
 import { limitsConfig } from "../limits/config.js";
@@ -111,16 +112,33 @@ export async function chatRoute(
     return json(200, { reply: replyText(result.value) });
   } catch (error) {
     const failure = classifyClaudeError(error);
-    logOutcome({ outcome: failure, durationMs: Date.now() - started });
-    if (failure === "spend_limit") return spendCapResponse(secondsUntilNextDay(now));
+    const durationMs = Date.now() - started;
+    if (failure === "spend_limit") {
+      logOutcome({ outcome: failure, durationMs });
+      return spendCapResponse(secondsUntilNextDay(now));
+    }
     if (failure === "rate_limit" || failure === "overloaded" || failure === "timeout") {
+      logOutcome({ outcome: failure, durationMs });
       return json(503, { error: "ai_busy", message: "The AI is busy. Try again in a minute." });
     }
-    // A person has to look at these (docs/calling-claude.md), so the error goes
-    // to the log too. SDK errors carry the status and type, not the request.
-    console.error("Chat model call failed", error);
-    return json(500, { error: "server_error", message: "Something went wrong" });
+    // A person has to look at these (docs/calling-claude.md), so they log as
+    // errors, with the error's class and status to go on.
+    logOutcome({ outcome: failure, durationMs, ...errorMetadata(error) }, "error");
+    return serverError();
   }
+}
+
+function serverError(): APIGatewayProxyResultV2 {
+  return json(500, { error: "server_error", message: "Something went wrong" });
+}
+
+// The error's class and status only: an SDK error's message can quote the API's
+// response, and logs hold metadata only (spec #2, Logging).
+function errorMetadata(error: unknown): { errorName?: string; status?: number } {
+  if (!(error instanceof Error)) return {};
+  const status = (error as { status?: unknown }).status;
+  // The SDK's classes all keep `name` as "Error", so the class tells them apart.
+  return { errorName: error.constructor.name, ...(typeof status === "number" ? { status } : {}) };
 }
 
 // The reservation must never be too small. Text like this runs well under one
@@ -142,14 +160,19 @@ function replyText(reply: ModelReply): string {
 }
 
 // Metadata only: never the visitor's text or the reply (spec #2, Logging).
-function logOutcome(fields: {
-  outcome: string;
-  durationMs: number;
-  inputTokens?: number;
-  outputTokens?: number;
-  stopReason?: string | null;
-}): void {
-  console.log(JSON.stringify({ route: "chat", ...fields }));
+function logOutcome(
+  fields: {
+    outcome: string;
+    durationMs?: number;
+    inputTokens?: number;
+    outputTokens?: number;
+    stopReason?: string | null;
+    errorName?: string;
+    status?: number;
+  },
+  level: "log" | "error" = "log",
+): void {
+  console[level](JSON.stringify({ route: "chat", ...fields }));
 }
 
 // Spec #2, Terms: an hour on production, and a minute elsewhere, because a
@@ -173,28 +196,16 @@ async function checkChatLimit(
       chatLimit(deps.target),
     );
   } catch (error) {
-    // Like the template's guard: a broken counter mustn't take the Chat down,
-    // and withSpendCap, which fails closed, still guards the money.
-    console.error("Chat rate limit check failed", error);
-    return undefined;
+    // A counter that can't answer hasn't said "under the limit", and the spec
+    // counts every POST, so the request is refused rather than let through.
+    logOutcome({ outcome: "rate_limit_error", ...errorMetadata(error) }, "error");
+    return serverError();
   }
   if (result.allowed) return undefined;
   const seconds = result.retryAfterSeconds;
-  return {
-    statusCode: 429,
-    headers: { "content-type": "application/json", "retry-after": String(seconds) },
-    body: JSON.stringify({
-      error: "chat_rate_limited",
-      message: `Too many questions. Try again in ${seconds} seconds.`,
-      retryAfterSeconds: seconds,
-    }),
-  };
-}
-
-function json(statusCode: number, body: unknown): APIGatewayProxyResultV2 {
-  return {
-    statusCode,
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(body),
-  };
+  return tooManyRequests(
+    "chat_rate_limited",
+    `Too many questions. Try again in ${seconds} seconds.`,
+    seconds,
+  );
 }

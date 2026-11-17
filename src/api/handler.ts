@@ -1,5 +1,6 @@
 import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from "aws-lambda";
 import { countNotes, getNote, putNote } from "../db/notes.js";
+import { json } from "./responses.js";
 import { chatRoute } from "../chat/chat.js";
 import { callerHash, guardRequest } from "../limits/guard.js";
 
@@ -101,12 +102,4 @@ function readText(body: string | undefined): string | undefined {
   } catch {
     return undefined;
   }
-}
-
-function json(statusCode: number, body: unknown): APIGatewayProxyResultV2 {
-  return {
-    statusCode,
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(body),
-  };
 }

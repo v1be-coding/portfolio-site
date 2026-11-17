@@ -9,6 +9,9 @@ export type Conversation = {
   pending: boolean;
   // Why the last send failed: an error from ../api.ts or a network TypeError.
   sendError: unknown;
+  // Kept apart from `messages` because a failed send empties the log again, and
+  // the suggestions must stay hidden after any send until the visitor starts over.
+  showSuggestions: boolean;
 };
 
 export type ConversationAction =
@@ -20,7 +23,12 @@ export type ConversationAction =
 // The API refuses a 30-message conversation, so at 30 the visitor must start over.
 export const MAX_MESSAGES = 30;
 
-export const INITIAL_CONVERSATION: Conversation = { messages: [], pending: false, sendError: null };
+export const INITIAL_CONVERSATION: Conversation = {
+  messages: [],
+  pending: false,
+  sendError: null,
+  showSuggestions: true,
+};
 
 export function isFull(messages: readonly Message[]): boolean {
   return messages.length >= MAX_MESSAGES;
@@ -33,16 +41,23 @@ export function conversationReducer(state: Conversation, action: ConversationAct
         messages: [...state.messages, { role: "user", content: action.text }],
         pending: true,
         sendError: null,
+        showSuggestions: false,
       };
     case "replied":
       return {
         messages: [...state.messages, { role: "assistant", content: action.text }],
         pending: false,
         sendError: null,
+        showSuggestions: false,
       };
     case "failed":
       // The unanswered question goes back to the textbox, so it leaves the log.
-      return { messages: state.messages.slice(0, -1), pending: false, sendError: action.error };
+      return {
+        messages: state.messages.slice(0, -1),
+        pending: false,
+        sendError: action.error,
+        showSuggestions: false,
+      };
     case "startedOver":
       return INITIAL_CONVERSATION;
   }

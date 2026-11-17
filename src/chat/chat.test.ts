@@ -235,12 +235,21 @@ describe("chatRoute rate limit", () => {
     expect(parsed(await post("not json"))).toMatchObject({ error: "chat_rate_limited" });
   });
 
-  it("lets a request through if the counter fails, since the spend cap still guards money", async () => {
+  it("refuses with the server_error 500 if the counter fails, and logs only the outcome", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
-    const { post, send } = setup();
-    send.mockRejectedValueOnce(new Error("throttled"));
+    const { post, send, create } = setup();
+    send.mockRejectedValueOnce(new Error("SECRET-throttled"));
 
-    expect(await post(valid)).toMatchObject({ statusCode: 200 });
+    const response = await post(valid);
+
+    expect(response).toMatchObject({ statusCode: 500 });
+    expect(parsed(response)).toEqual({ error: "server_error", message: "Something went wrong" });
+    expect(create).not.toHaveBeenCalled();
+    const calls = [...vi.mocked(console.error).mock.calls, ...vi.mocked(console.log).mock.calls];
+    expect(calls.flat().every((arg) => typeof arg === "string")).toBe(true);
+    const logged = calls.flat().join("\n");
+    expect(logged).not.toContain("SECRET");
+    expect(JSON.parse(logged)).toMatchObject({ outcome: "rate_limit_error", errorName: "Error" });
   });
 
   it.each(["GET", "PUT", "PATCH", "DELETE"])(
@@ -366,6 +375,30 @@ describe("chatRoute spend cap and model errors", () => {
     expect(response).toMatchObject({ statusCode: 500 });
     expect(parsed(response)).toEqual(SERVER_ERROR);
     expect(console.error).toHaveBeenCalled();
+  });
+
+  it.each([
+    [
+      "an auth failure",
+      () => apiError(401, "authentication_error", "SECRET-token"),
+      { outcome: "auth", errorName: "AuthenticationError", status: 401 },
+    ],
+    [
+      "any other error",
+      () => new TypeError("SECRET-boom"),
+      { outcome: "other", errorName: "TypeError" },
+    ],
+  ])("logs %s as metadata only, never the error or its text", async (_name, error, expected) => {
+    const { post, create } = setup();
+    create.mockRejectedValue(error());
+
+    await post(valid);
+
+    const calls = [...vi.mocked(console.error).mock.calls, ...vi.mocked(console.log).mock.calls];
+    expect(calls.flat().every((arg) => typeof arg === "string")).toBe(true);
+    const logged = calls.flat().join("\n");
+    expect(logged).not.toContain("SECRET");
+    expect(JSON.parse(logged)).toMatchObject(expected);
   });
 
   it("answers with the server_error 500 when the client can't be set up", async () => {

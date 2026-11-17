@@ -176,7 +176,7 @@ export function Chat() {
             <ChatMessage key={index} role={message.role} content={message.content} />
           ))}
         </div>
-        {messages.length === 0 && (
+        {conversation.showSuggestions && (
           <ul className="chat-suggestions">
             {SUGGESTIONS.map((question) => (
               <li key={question}>
