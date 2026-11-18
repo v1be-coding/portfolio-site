@@ -1,11 +1,13 @@
 import type { APIGatewayProxyEventV2 } from "aws-lambda";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { countNotes, getNote, putNote } from "../db/notes.js";
-import { guardRequest } from "../limits/guard.js";
+import { chatRoute } from "../chat/chat.js";
+import { callerHash, guardRequest } from "../limits/guard.js";
 import { handler } from "./handler.js";
 
 vi.mock("../db/notes.js", () => ({ countNotes: vi.fn(), getNote: vi.fn(), putNote: vi.fn() }));
-vi.mock("../limits/guard.js", () => ({ guardRequest: vi.fn() }));
+vi.mock("../limits/guard.js", () => ({ guardRequest: vi.fn(), callerHash: vi.fn() }));
+vi.mock("../chat/chat.js", () => ({ chatRoute: vi.fn() }));
 
 const id = "6f1c2f6e-3f0a-4a53-9d7e-0a4f9c1b2d3e";
 
@@ -30,6 +32,86 @@ describe("handler", () => {
 
     expect(response).toMatchObject({ statusCode: 429 });
     expect(putNote).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["a route's answer", () => request("GET", "/api/health")],
+    ["a 404", () => request("GET", "/nope")],
+    ["a 405", () => request("POST", "/api/notes/count")],
+  ])("sends no-store and nosniff on %s", async (_name, make) => {
+    const response = await handler(make());
+
+    expect(response).toMatchObject({
+      headers: { "cache-control": "no-store", "x-content-type-options": "nosniff" },
+    });
+  });
+
+  it("sends no-store and nosniff on the guard's refusal, keeping its own headers", async () => {
+    vi.mocked(guardRequest).mockResolvedValue({
+      statusCode: 429,
+      headers: { "retry-after": "30" },
+      body: "{}",
+    });
+
+    const response = await handler(request("GET", "/api/health"));
+
+    expect(response).toMatchObject({
+      statusCode: 429,
+      headers: {
+        "retry-after": "30",
+        "cache-control": "no-store",
+        "x-content-type-options": "nosniff",
+      },
+    });
+  });
+
+  it("sends no-store and nosniff on a guard refusal that has no headers", async () => {
+    vi.mocked(guardRequest).mockResolvedValue({ statusCode: 403, body: "" });
+
+    const response = await handler(request("GET", "/api/health"));
+
+    expect(response).toMatchObject({
+      statusCode: 403,
+      headers: { "cache-control": "no-store", "x-content-type-options": "nosniff" },
+    });
+  });
+
+  it("sends POST /api/chat to the chat route with the caller's hash", async () => {
+    vi.mocked(chatRoute).mockResolvedValue({ statusCode: 200, body: '{"reply":"hi"}' });
+    vi.mocked(callerHash).mockReturnValue("hash");
+
+    const response = await handler(request("POST", "/api/chat", '{"messages":[]}'));
+
+    expect(chatRoute).toHaveBeenCalledWith({
+      method: "POST",
+      body: '{"messages":[]}',
+      callerHash: "hash",
+    });
+    expect(response).toMatchObject({
+      statusCode: 200,
+      headers: { "cache-control": "no-store", "x-content-type-options": "nosniff" },
+    });
+  });
+
+  it("decodes a base64 body before the chat route reads it", async () => {
+    vi.mocked(chatRoute).mockResolvedValue({ statusCode: 200, body: "{}" });
+    const event = {
+      ...request("POST", "/api/chat", Buffer.from('{"messages":[]}').toString("base64")),
+      isBase64Encoded: true,
+    } as APIGatewayProxyEventV2;
+
+    await handler(event);
+
+    expect(chatRoute).toHaveBeenCalledWith(expect.objectContaining({ body: '{"messages":[]}' }));
+  });
+
+  it("checks the global per-IP limit before the chat route", async () => {
+    vi.mocked(guardRequest).mockResolvedValue({ statusCode: 429, body: "{}" });
+
+    const response = await handler(request("POST", "/api/chat", "{}"));
+
+    expect(response).toMatchObject({ statusCode: 429 });
+    expect(chatRoute).not.toHaveBeenCalled();
   });
 
   it("returns 404 for anything else", async () => {

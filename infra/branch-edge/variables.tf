@@ -23,3 +23,8 @@ variable "origin_access_control_id" {
   description = "The account's origin access control, which v1be-infra owns."
   type        = string
 }
+
+variable "headers_policy" {
+  description = "Production's security headers policy for this episode, which v1be-infra owns."
+  type        = string
+}

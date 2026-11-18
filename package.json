@@ -9,7 +9,7 @@
     "build": "npm run build:api && npm run build:db && npm run build:web",
     "build:api": "esbuild src/api/handler.ts --bundle --platform=node --target=node24 --format=cjs --external:pg-native --outfile=dist/api/index.js",
     "build:db": "esbuild src/db/deploy.ts --bundle --platform=node --target=node24 --format=cjs --external:pg-native --outfile=dist/db/deploy.cjs",
-    "build:web": "vite build",
+    "build:web": "vite build && vite build --ssr prerender.tsx && node dist/prerender/prerender.js dist/web && npm run build:resume",
     "db:generate": "aurora-dsql-drizzle generate --out ./drizzle -- --config drizzle.config.ts",
     "test": "vitest run && node --test '.claude/**/*.test.mjs' 'scripts/*.test.mjs'",
     "typecheck": "tsc --noEmit",
@@ -17,7 +17,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "prepare": "husky",
-    "secrets": "secretlint \"**/*\""
+    "secrets": "secretlint \"**/*\"",
+    "build:resume": "esbuild src/resume/build.ts --bundle --platform=node --target=node24 --format=esm --packages=external --outfile=dist/resume/build.mjs && node dist/resume/build.mjs dist/web"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
@@ -25,6 +26,7 @@
     "@secretlint/secretlint-rule-preset-recommend": "13.1.0",
     "@types/aws-lambda": "8.10.164",
     "@types/node": "24.19.2",
+    "@types/pdfkit": "0.17.7",
     "@types/pg": "8.23.1",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
@@ -37,6 +39,7 @@
     "globals": "17.13.0",
     "husky": "9.1.7",
     "lint-staged": "17.6.0",
+    "pdfkit": "0.20.2",
     "prettier": "3.9.10",
     "secretlint": "13.1.0",
     "typescript": "6.0.3",
