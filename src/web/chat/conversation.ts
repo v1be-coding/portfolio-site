@@ -21,7 +21,7 @@ export type ConversationAction =
   | { type: "startedOver" };
 
 // The API refuses a 30-message conversation, so at 30 the visitor must start over.
-export const MAX_MESSAGES = 30;
+const MAX_MESSAGES = 30;
 
 export const INITIAL_CONVERSATION: Conversation = {
   messages: [],

@@ -9,8 +9,6 @@ export type Route =
   | { page: "episode"; path: string; episode: Episode }
   | { page: "notFound"; path: null };
 
-export type PageName = Route["page"];
-
 export type Head = { title: string; description: string; canonical: string | null };
 
 const SERIES_PATH = "/v1be-coding";

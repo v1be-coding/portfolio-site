@@ -3,7 +3,7 @@
 // never computed, so the prerendered HTML and the browser agree. The phone
 // number never goes in here: this file is public and feeds the PDF.
 
-export type Profile = {
+type Profile = {
   name: string;
   tagline: string;
   availability: string;
@@ -32,13 +32,13 @@ export type Experience = {
   engagements: readonly Engagement[];
 };
 
-export type SkillGroup = { label: string; items: readonly string[] };
+type SkillGroup = { label: string; items: readonly string[] };
 
 export type Education = { degree: string; school: string; year: string };
 
-export type SeriesStep = { title: string; text: string };
+type SeriesStep = { title: string; text: string };
 
-export type Series = { intro: string; steps: readonly SeriesStep[] };
+type Series = { intro: string; steps: readonly SeriesStep[] };
 
 /** An Episode's results, as the series rules define them. */
 export type Scorecard = {
@@ -51,7 +51,7 @@ export type Scorecard = {
   frozenTestsWrong: string;
 };
 
-export type Demo = { src: string; alt: string; width: number; height: number };
+type Demo = { src: string; alt: string; width: number; height: number };
 
 export type Episode = {
   number: number;
