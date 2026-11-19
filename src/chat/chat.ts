@@ -177,7 +177,7 @@ function logOutcome(
 
 // Spec #2, Terms: an hour on production, and a minute elsewhere, because a
 // branch's fix rounds rerun the whole suite within the same hour.
-export function chatLimit(target: string): RateLimit {
+function chatLimit(target: string): RateLimit {
   return { name: "chat", requests: 20, windowSeconds: target === "production" ? 3600 : 60 };
 }
 

@@ -10,7 +10,7 @@ type HeadTag = { tag: "meta" | "link"; attributes: Record<string, string> };
 // leaves Vite's stylesheet and script links alone.
 const MARKER = "data-route-head";
 
-export function headTags(head: Head): HeadTag[] {
+function headTags(head: Head): HeadTag[] {
   const meta = (attributes: Record<string, string>): HeadTag => ({ tag: "meta", attributes });
   const tags = [meta({ name: "description", content: head.description })];
   if (head.canonical === null) {
