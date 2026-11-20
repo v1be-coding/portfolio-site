@@ -95,11 +95,16 @@ resource "aws_cloudfront_distribution" "site" {
       value = var.api_origin_secret
     }
 
+    # The API runs in one region, far from many edges. With the default 5-second
+    # keep-alive, an edge's origin connections close between a sender's calls, and
+    # each reopened one costs two extra round trips to the origin (about 440 ms
+    # from US edges). 60 seconds is the most CloudFront allows without a quota raise.
     custom_origin_config {
-      http_port              = 80
-      https_port             = 443
-      origin_protocol_policy = "https-only"
-      origin_ssl_protocols   = ["TLSv1.2"]
+      http_port                = 80
+      https_port               = 443
+      origin_protocol_policy   = "https-only"
+      origin_ssl_protocols     = ["TLSv1.2"]
+      origin_keepalive_timeout = 60
     }
   }
 
@@ -130,12 +135,13 @@ resource "aws_cloudfront_distribution" "site" {
     compress                   = true
   }
 
-  # A missing page is a 403 from the private bucket, so both map to the 404 page,
-  # which keeps its no-cache metadata. As in production, this covers the whole
-  # distribution, so an API 403 or 404 also gets the page. The TTL is short so a
-  # page that a later deploy adds isn't hidden behind a cached 404.
+  # A missing page is a 403 from the private bucket: CloudFront may only
+  # s3:GetObject, so S3 never says 404. As in production, only 403 maps to the
+  # 404 page, because the mapping covers the whole distribution and a mapped 404
+  # hid the API's JSON 404s. The page keeps its no-cache metadata, and the TTL is
+  # short so a page that a later deploy adds isn't hidden behind a cached 404.
   dynamic "custom_error_response" {
-    for_each = [403, 404]
+    for_each = [403]
 
     content {
       error_code            = custom_error_response.value
