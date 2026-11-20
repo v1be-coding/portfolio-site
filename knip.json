@@ -7,6 +7,7 @@
     ".claude/skills/*/scripts/*.mjs"
   ],
   "project": ["src/**/*.{ts,tsx}", "scripts/**/*.mjs", ".claude/**/*.mjs", "*.{ts,js}"],
+  "ignore": ["src/ai/ainakupo.ts"],
   "ignoreDependencies": [
     "@secretlint/secretlint-rule-pattern",
     "@secretlint/secretlint-rule-preset-recommend"

@@ -38,8 +38,10 @@ function setup(options: { chatCount?: number; target?: string } = {}) {
   const create = vi.fn().mockResolvedValue(modelReply("Emiliano works at Prostrive."));
   const client: ModelClient = { messages: { create } };
   const { db, send } = fakeStore(options.chatCount);
+  const report = vi.fn().mockResolvedValue(undefined);
   const deps: ChatDeps = {
     client: () => Promise.resolve(client),
+    reporter: () => Promise.resolve({ report }),
     db,
     table: "limits",
     target: options.target ?? "branch-1",
@@ -48,7 +50,7 @@ function setup(options: { chatCount?: number; target?: string } = {}) {
   };
   const post = (requestBody: string | undefined) =>
     chatRoute({ method: "POST", body: requestBody, callerHash: "abc" }, deps);
-  return { create, send, deps, post };
+  return { create, send, deps, post, report };
 }
 
 const parsed = (response: unknown) => JSON.parse((response as { body: string }).body) as unknown;
@@ -409,6 +411,84 @@ describe("chatRoute spend cap and model errors", () => {
 
     expect(response).toMatchObject({ statusCode: 500 });
     expect(parsed(response)).toEqual(SERVER_ERROR);
+  });
+});
+
+describe("chatRoute traces", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+
+  it("reports an answered call with its tokens and cost, and no text", async () => {
+    const { post, report } = setup();
+
+    await post(valid);
+
+    expect(report).toHaveBeenCalledTimes(1);
+    const trace = report.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(trace).toMatchObject({
+      feature: "chat",
+      model: "claude-haiku-5-5",
+      inputTokens: 2000,
+      outputTokens: 40,
+      status: "ok",
+    });
+    // 2,000 input at $0.10 and 40 output at $0.50 per million.
+    expect(trace.costUsd).toBeCloseTo(0.00022, 10);
+    expect(trace.startedAt).toBeInstanceOf(Date);
+    expect(typeof trace.durationMs).toBe("number");
+    expect(trace).not.toHaveProperty("prompt");
+    expect(trace).not.toHaveProperty("response");
+  });
+
+  it("counts cached input tokens in the trace", async () => {
+    const { post, create, report } = setup();
+    create.mockResolvedValue({
+      ...modelReply("Hi"),
+      usage: { input_tokens: 100, output_tokens: 5, cache_read_input_tokens: 1900 },
+    });
+
+    await post(valid);
+
+    expect(report.mock.calls[0]?.[0]).toMatchObject({ inputTokens: 2000, outputTokens: 5 });
+  });
+
+  it("reports a failed call as an error with no tokens and an unknown cost", async () => {
+    const { post, create, report } = setup();
+    create.mockRejectedValue(apiError(529, "overloaded_error", "Overloaded"));
+
+    await post(valid);
+
+    expect(report).toHaveBeenCalledTimes(1);
+    expect(report.mock.calls[0]?.[0]).toMatchObject({
+      status: "error",
+      inputTokens: 0,
+      outputTokens: 0,
+      costUsd: null,
+    });
+  });
+
+  it("reports nothing when the daily cap stops the call", async () => {
+    const { post, send, report } = setup();
+    send.mockImplementation((command: UpdateItemCommand) =>
+      (command.input.Key?.pk?.S ?? "").startsWith("spend#")
+        ? Promise.reject(new ConditionalCheckFailedException({ message: "full", $metadata: {} }))
+        : Promise.resolve({ Attributes: { count: { N: "1" } } }),
+    );
+
+    await post(valid);
+
+    expect(report).not.toHaveBeenCalled();
+  });
+
+  it("reports nothing for a request refused before the model", async () => {
+    const { post, report } = setup();
+
+    await post("not json");
+
+    expect(report).not.toHaveBeenCalled();
   });
 });
 

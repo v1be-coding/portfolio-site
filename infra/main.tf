@@ -110,6 +110,25 @@ data "aws_iam_policy_document" "api" {
     resources = ["arn:aws:ssm:ap-southeast-1:${var.account_id}:parameter/${var.episode}/*"]
   }
 
+  # The AInakupo keys are SecureStrings, and reading one with decryption needs
+  # kms:Decrypt too. Only through Parameter Store, for this episode's parameters.
+  statement {
+    actions   = ["kms:Decrypt"]
+    resources = ["arn:aws:kms:ap-southeast-1:${var.account_id}:key/*"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "kms:ViaService"
+      values   = ["ssm.ap-southeast-1.amazonaws.com"]
+    }
+
+    condition {
+      test     = "StringLike"
+      variable = "kms:EncryptionContext:PARAMETER_ARN"
+      values   = ["arn:aws:ssm:ap-southeast-1:${var.account_id}:parameter/${var.episode}/*"]
+    }
+  }
+
   statement {
     actions   = ["dsql:DbConnect"]
     resources = [aws_dsql_cluster.db.arn]
