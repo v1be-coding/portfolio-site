@@ -1,6 +1,8 @@
 import type { APIGatewayProxyResultV2 } from "aws-lambda";
 import { json, tooManyRequests } from "../api/responses.js";
 import { claude, classifyClaudeError } from "../ai/claude.js";
+import { fromAnthropicUsage } from "../ai/ainakupo.js";
+import { type CallTrace, type Reporter, reporter } from "../ai/traces.js";
 import { content } from "../content/content.js";
 import { limitsConfig } from "../limits/config.js";
 import { spendCapResponse } from "../limits/guard.js";
@@ -45,6 +47,8 @@ export type ChatRequest = { method: string; body: string | undefined; callerHash
 
 export type ChatDeps = {
   client: () => Promise<ModelClient>;
+  // Never rejects: a reporter that can't start reports nothing.
+  reporter: () => Promise<Reporter>;
   db: Store;
   table: string;
   target: string;
@@ -56,6 +60,7 @@ function defaultDeps(): ChatDeps {
   const config = limitsConfig();
   return {
     client: claude,
+    reporter,
     db: store(),
     table: config.table,
     target: config.target,
@@ -80,6 +85,22 @@ export async function chatRoute(
 
   const now = deps.now();
   const started = Date.now();
+  // Started now so reading its key overlaps the model call.
+  const tracing = deps.reporter();
+  const trace = async (
+    fields: Pick<CallTrace, "inputTokens" | "outputTokens" | "costUsd" | "status">,
+  ) => {
+    // Timed before waiting on the reporter, so a slow key read isn't counted.
+    const durationMs = Date.now() - started;
+    const r = await tracing;
+    await r.report({
+      feature: "chat",
+      model: MODEL,
+      startedAt: new Date(started),
+      durationMs,
+      ...fields,
+    });
+  };
   try {
     const result = await withSpendCap(
       worstCaseUsd(inputTokenBound(messages), MAX_TOKENS, PRICES),
@@ -102,6 +123,7 @@ export async function chatRoute(
     }
 
     const { usage, stop_reason } = result.value;
+    await trace({ ...fromAnthropicUsage(usage), costUsd: costUsd(usage, PRICES), status: "ok" });
     logOutcome({
       outcome: "ok",
       inputTokens: usage.input_tokens,
@@ -113,6 +135,8 @@ export async function chatRoute(
   } catch (error) {
     const failure = classifyClaudeError(error);
     const durationMs = Date.now() - started;
+    // A failed call's tokens aren't known, so it's reported with none.
+    await trace({ inputTokens: 0, outputTokens: 0, costUsd: null, status: "error" });
     if (failure === "spend_limit") {
       logOutcome({ outcome: failure, durationMs });
       return spendCapResponse(secondsUntilNextDay(now));

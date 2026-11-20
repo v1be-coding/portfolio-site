@@ -67,3 +67,12 @@ If a spec needs streaming, pass an `AbortSignal` with a deadline under the Lambd
 ## Logging
 
 Log metadata only: token counts, `stop_reason`, duration and outcome. Never log the visitor's text or the reply.
+
+## Reporting to AInakupo
+
+Each model call, answered or failed, is also sent as a trace to [AInakupo](https://ainakupo.emilianocasijr.com), the series' LLM tracing episode. Use `reporter()` from `src/ai/traces.ts`, and see `src/chat/chat.ts`.
+
+- **`src/ai/ainakupo.ts` is AInakupo's SDK, copied as it is.** Don't edit it. To update it, download it again from `https://ainakupo.emilianocasijr.com/sdk/ainakupo.ts` and review the diff. `knip.json` ignores it, since the app doesn't use every export.
+- **Keys:** production reads `/<episode>/ainakupo/production-key`, which puts its traces on AInakupo's public dashboard. Every other target reads `preview-key`. The owner makes both with `v1be-infra`'s `sandbox/wizards/ainakupo-keys.sh`. Until then, nothing is reported.
+- **Traces carry no text:** no question and no reply, only the model, tokens, cost, duration and status.
+- **A trace never costs the answer.** `report` never throws, and gives up after 1 second.
